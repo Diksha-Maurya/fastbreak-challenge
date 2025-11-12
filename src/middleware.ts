@@ -1,24 +1,53 @@
-import { NextResponse, NextRequest } from 'next/server'
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+// src/middleware.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
-  const { data: { session } } = await supabase.auth.getSession()
-
   const { pathname } = req.nextUrl
-  const isAuthRoute = pathname.startsWith('/auth')
-  const isApi = pathname.startsWith('/api')
 
-  // Gate everything except auth routes, API, and static assets
-  if (!session && !isAuthRoute && !isApi) {
+  // Public routes
+  const publicRoutes = new Set([
+    '/', 
+    '/auth/sign-in',
+    '/auth/sign-out',
+    '/auth/callback', 
+  ])
+  if (publicRoutes.has(pathname)) return NextResponse.next()
+
+  const res = NextResponse.next()
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return req.cookies.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          res.cookies.set({ name, value, ...options })
+        },
+        remove(name: string, options: CookieOptions) {
+          res.cookies.set({ name, value: '', ...options, maxAge: 0 })
+        },
+      },
+    }
+  )
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
     const url = req.nextUrl.clone()
     url.pathname = '/auth/sign-in'
+    url.searchParams.set('redirectedFrom', pathname)
     return NextResponse.redirect(url)
   }
+
   return res
 }
 
 export const config = {
-  matcher: ['/', '/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }

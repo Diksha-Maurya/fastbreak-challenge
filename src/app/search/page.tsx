@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 
 type ApiResult = {
   template: string; confidence: number; parsedConstraint: string | null;
@@ -18,13 +19,36 @@ export default function SearchPage() {
     setLoading(true); setError(null); setRes(null)
     const r = await fetch('/api/search', { method: 'POST', body: JSON.stringify({ query: q }) })
     if (!r.ok) { setError('Request failed'); setLoading(false); return }
-    const json = await r.json()
-    setRes(json); setLoading(false)
+    const json = await r.json();
+    if (Array.isArray(json.results)) {
+      setRes({
+        template: json.results[0]?.template ?? "No match found",
+        confidence: 1 - (json.results[0]?.distance ?? 1),
+        parsedConstraint: null,
+        parameters: {},
+        alternatives: json.results.map((r: any, i: number) => ({
+          reason: `Match ${i + 1}`,
+          parsedConstraint: r.text,
+          confidence: 1 - r.distance,
+        })),
+      });
+    } else {
+      setError("Unexpected response format");
+    }
+    setLoading(false);
   }
 
   return (
     <main className="p-6 space-y-4">
-      <h1 className="text-2xl font-semibold">Constraint Search</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold">Constraint Search</h1>
+        <Link 
+          href="/auth/sign-out"
+          className="rounded bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 text-sm"
+        >
+          Sign Out
+        </Link>
+      </div>
       <form onSubmit={submit} className="flex gap-2">
         <input
           value={q} onChange={e=>setQ(e.target.value)}
