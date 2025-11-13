@@ -1,4 +1,3 @@
-// src/app/api/search/route.ts
 import 'dotenv/config'
 import axios from 'axios'
 import { NextResponse } from 'next/server'
@@ -38,34 +37,33 @@ export async function POST(req: Request) {
     const qt = query.toLowerCase()
 
     function nudge(template: string): number {
-      const isT1 = /Template 1: /.test(template)
-      const isT2 = /Template 2: /.test(template)
-      const isT3 = /Template 3: /.test(template)
+    const isT1 = /Template 1: /.test(template)
+    const isT2 = /Template 2: /.test(template)
+    const isT3 = /Template 3: /.test(template)
 
-      const hasSequenceWords =
-        /(back[\s-]?to[\s-]?back|consecutive|sequence|second half)/.test(qt)
+    const hasSequenceWords =
+      /(back[\s-]?to[\s-]?back|consecutive|sequence|second\s+half)/.test(qt)
 
-      const hasByeSequence =
-        /(either side of .*bye|either side of their bye|before their bye|after their bye|bye week)/.test(qt)
+    const hasByeSequence =
+      /(either side of .*bye|either side of their bye|before their bye|after their bye|bye week)/.test(qt)
 
-      const hasTeamPattern =
-        /(each team|every team|for teams|no team|per[-\s]?team)/.test(qt) &&
-        /(home|away|bye|active)/.test(qt)
+    const hasTeamPattern =
+      /(each team|every team|for teams|no team|per[-\s]?team)/.test(qt) &&
+      /(home|away|bye|active)/.test(qt)
 
-      // Strong nudge towards Template 2 for bye-week / sequence phrasing
-      if ((hasSequenceWords || hasByeSequence) && isT2) return 0.04
+    if ((hasSequenceWords || hasByeSequence) && isT2) return 0.10
 
-      // Nudge towards Template 3 for per-team schedule pattern phrasing
-      if (hasTeamPattern && isT3) return 0.03
+    if ((hasSequenceWords || hasByeSequence) && isT1) return -0.05
+    // Small nudge to Template 3 for team-pattern scheduling
+    if (hasTeamPattern && isT3) return 0.03
 
-      // Light nudge to Template 1 for general scheduling/venue/network language
-      if (!hasSequenceWords && !hasByeSequence && !hasTeamPattern && isT1 &&
-          /(espn|cbs|network|venue|rivalry|schedule)/.test(qt)) {
-        return 0.01
-      }
-
-      return 0
+    if (!hasSequenceWords && !hasByeSequence && !hasTeamPattern && isT1 &&
+        /(espn|cbs|network|venue|rivalry|schedule)/.test(qt)) {
+      return 0.01
     }
+
+    return 0
+  }
 
     const adjusted = (rows ?? [])
       .map((r: any) => ({
