@@ -1,47 +1,81 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import axios from "axios";
+import 'dotenv/config'
+import axios from 'axios'
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+)
 
-const JINA_API = "https://api.jina.ai/v1/embeddings";
-const model = "jina-embeddings-v3";
+const JINA_API = 'https://api.jina.ai/v1/embeddings'
+const JINA_MODEL = 'jina-embeddings-v3'
+const HEADERS = { Authorization: `Bearer ${process.env.JINA_API_KEY}` }
 
 export async function POST(req: Request) {
   try {
-    const { query } = await req.json();
-
-    if (!query) {
-      return NextResponse.json({ error: "Missing query" }, { status: 400 });
+    const { query } = await req.json()
+    if (!query || typeof query !== 'string') {
+      return NextResponse.json({ error: 'invalid_query' }, { status: 400 })
     }
-
-    const jinaResponse = await axios.post(
+    // 1) Get embedding from Jina AI
+    const { data } = await axios.post(
       JINA_API,
-      { model, input: query },
-      { headers: { Authorization: `Bearer ${process.env.JINA_API_KEY}` } }
-    );
+      { input: [query], model: JINA_MODEL },
+      { headers: HEADERS }
+    )
+    const qEmb: number[] = data.data[0].embedding
 
-    const embedding = jinaResponse.data.data[0].embedding;
+    // 2) Vector search in Supabase
+    const { data: rows, error } = await supabase.rpc('search_constraints', {
+      q: qEmb,
+      k: 5,
+    })
+    if (error) throw error
 
-    const { data, error } = await supabase.rpc('match_constraints', {
-      query_vec: embedding,
-      match_count: 5,
-    });
+    // 3) Keyword-based nudge on distances (tie-breaker)
+    const qt = query.toLowerCase()
 
-    if (error) {
-      console.error(error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    function nudge(template: string): number {
+    const isT1 = /Template 1: /.test(template)
+    const isT2 = /Template 2: /.test(template)
+    const isT3 = /Template 3: /.test(template)
+
+    const hasSequenceWords =
+      /(back[\s-]?to[\s-]?back|consecutive|sequence|second\s+half)/.test(qt)
+
+    const hasByeSequence =
+      /(either side of .*bye|either side of their bye|before their bye|after their bye|bye week)/.test(qt)
+
+    const hasTeamPattern =
+      /(each team|every team|for teams|no team|per[-\s]?team)/.test(qt) &&
+      /(home|away|bye|active)/.test(qt)
+
+    if ((hasSequenceWords || hasByeSequence) && isT2) return 0.10
+
+    if ((hasSequenceWords || hasByeSequence) && isT1) return -0.05
+    // Small nudge to Template 3 for team-pattern scheduling
+    if (hasTeamPattern && isT3) return 0.03
+
+    if (!hasSequenceWords && !hasByeSequence && !hasTeamPattern && isT1 &&
+        /(espn|cbs|network|venue|rivalry|schedule)/.test(qt)) {
+      return 0.01
     }
 
-    return NextResponse.json({ results: data });
-  } catch (err: any) {
-    console.error(err);
-    return NextResponse.json(
-      { error: err.message || "Internal Server Error" },
-      { status: 500 }
-    );
+    return 0
+  }
+
+    const adjusted = (rows ?? [])
+      .map((r: any) => ({
+        ...r,
+        distance: Math.max(0, r.distance - nudge(r.template)),
+      }))
+      .sort((a: any, b: any) => a.distance - b.distance)
+
+    // 4) Return shape your UI expects
+    return NextResponse.json({ results: adjusted }, { status: 200 })
+  } catch (e) {
+    console.error(e)
+    return NextResponse.json({ error: 'search_failed' }, { status: 500 })
   }
 }
