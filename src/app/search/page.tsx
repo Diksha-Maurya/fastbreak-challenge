@@ -192,16 +192,38 @@ export default function SearchPage() {
     : []
 
   const templateLabel = top?.template ?? 'Unknown template'
-  const params = extractParameters(templateLabel, q)
-  const parsed = buildParsedConstraint(templateLabel, params)
+const params = extractParameters(templateLabel, q)
 
-  setRes({
-    template: templateLabel,
-    confidence: topConf,
-    parsedConstraint: parsed,
-    parameters: params,
-    alternatives,
-  })
+// consider it "empty" if we couldn't extract anything meaningful
+const emptyParams =
+  params.min === null &&
+  params.max === null &&
+  (!params.games || params.games.length === 0) &&
+  (!params.rounds || params.rounds.length === 0) &&
+  (!params.venues || params.venues.length === 0) &&
+  (!params.networks || params.networks.length === 0) &&
+  (!params.teams || params.teams.length === 0)
+
+// if low confidence OR no parameters, show a friendly error instead of a fake constraint
+if (topConf < 0.7 || emptyParams) {
+  setError(
+    'I couldn’t confidently extract a structured constraint from that query. ' +
+    'Try phrasing it more like: "At most 2 cases of 3 away games in 4 rounds for Western Conference teams."'
+  )
+  setLoading(false)
+  return
+}
+
+const parsed = buildParsedConstraint(templateLabel, params)
+
+setRes({
+  template: templateLabel,
+  confidence: topConf,
+  parsedConstraint: parsed,
+  parameters: params,
+  alternatives,
+})
+
 } else {
   setError('Unexpected response format')
 }
@@ -224,7 +246,11 @@ export default function SearchPage() {
         <input
           value={q} onChange={e=>setQ(e.target.value)}
           placeholder='e.g. "Ensure all rivalry games on a weekend on ESPN"'
-          className="flex-1 border rounded p-2"
+          className="flex-1 rounded border border-gray-500
+          bg-white
+          px-3 py-2
+          text-black placeholder:text-gray-500
+          focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button className="rounded bg-black text-white px-4">Search</button>
       </form>
