@@ -91,7 +91,7 @@ function extractParameters(template: string, query: string): ConstraintParams {
   teams.push(...multiWordTeams)
 
   const stopWords = new Set([
-    'make', 'sure', 'do', 'not', 'play', 'plays', 'at', 'home', 'on',
+    'make', 'sure', 'do', 'not', 'no',  'don', "don't", 'dont', 'play', 'plays', 'at', 'home', 'on',
     'either', 'side', 'their', 'week', 'weeks', 'the', 'and', 'or', 'of',
     'in', 'across', 'ensure', 'schedule', 'guarantee', 'require', 'for',
     'each', 'that', 'least', 'most', 'min', 'max', 'game', 'games',
