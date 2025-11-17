@@ -23,16 +23,39 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
 function extractParameters(template: string, query: string): ConstraintParams {
   const q = query.toLowerCase()
 
-  const nums = Array.from(q.matchAll(/\b\d+\b/g)).map(m => parseInt(m[0], 10))
-  let min: number | null = null
-  let max: number | null = null
-  if (nums.length === 1) {
-    min = nums[0]
+let min: number | null = null
+let max: number | null = null
+
+const qNorm = q.replace(/\s+/g, ' ')
+
+let m = qNorm.match(/between\s+(\d+)\s+and\s+(\d+)/)
+if (!m) m = qNorm.match(/from\s+(\d+)\s+to\s+(\d+)/)
+if (!m) m = qNorm.match(/at least\s+(\d+)[^0-9]+at most\s+(\d+)/)
+
+if (m) {
+  min = parseInt(m[1], 10)
+  max = parseInt(m[2], 10)
+} else {
+  const atMost = qNorm.match(/at most\s+(\d+)/)
+  const atLeast = qNorm.match(/at least\s+(\d+)/)
+
+  if (atMost) {
+    max = parseInt(atMost[1], 10)
+    min = 0
+  } else if (atLeast) {
+    min = parseInt(atLeast[1], 10)
     max = 999
-  } else if (nums.length >= 2) {
-    min = nums[0]
-    max = nums[1]
+  } else {
+    const nums = Array.from(qNorm.matchAll(/\b\d+\b/g)).map(m => parseInt(m[0], 10))
+    if (nums.length === 1) {
+      min = nums[0]
+      max = 999
+    } else if (nums.length >= 2) {
+      min = nums[0]
+      max = nums[1]
+    }
   }
+}
 
   const games: string[] = []
   const rounds: string[] = []
@@ -42,12 +65,17 @@ function extractParameters(template: string, query: string): ConstraintParams {
 
   if (/rivalry/.test(q)) games.push('rivalry_games')
   if (/high profile/.test(q)) games.push('high_profile_games')
+  if (/marquee/.test(q)) games.push('marquee_games')
+  if (/conference game/.test(q)) games.push('conference_games')
+  if (/non[- ]conference game/.test(q)) games.push('non_conference_games')
 
   const matchupRe = /\b[A-Z]{2,4}@[A-Z]{2,4}\b/g
   const matchupMatches = query.match(matchupRe)
   if (matchupMatches) {
     games.push(...matchupMatches)
   }
+  if (/domed stadiums?/.test(q)) venues.push('domed_stadiums')
+  if (/indoor arenas?/.test(q)) venues.push('indoor_arenas')
   if (/home games/.test(q)) venues.push('home_venues')
   if (/away games/.test(q)) venues.push('away_venues')
   if (/neutral site/.test(q)) venues.push('neutral_venues')
@@ -67,7 +95,7 @@ function extractParameters(template: string, query: string): ConstraintParams {
   // TEAM extraction
   // Handle known multi-word team names first
   const multiTeamPatterns: { [key: string]: RegExp } = {
-   'Penn State': /\bPenn State\b/gi,
+  'Penn State': /\bPenn State\b/gi,
   'Florida State': /\bFlorida State\b/gi,
   'Arizona State': /\bArizona State\b/gi,
   'Washington State': /\bWashington State\b/gi,
@@ -80,7 +108,7 @@ function extractParameters(template: string, query: string): ConstraintParams {
     }
   }
 
-  const multiWordTeamRe = /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)+)\b/g
+  const multiWordTeamRe = /\b([A-Z][a-z]+(?:\s[A-Z][a-z]*)+)\b/g
   const multiWordTeams: string[] = []
   let mwMatch
 
@@ -96,7 +124,7 @@ function extractParameters(template: string, query: string): ConstraintParams {
     'in', 'across', 'ensure', 'schedule', 'guarantee', 'require', 'for',
     'each', 'that', 'least', 'most', 'min', 'max', 'game', 'games',
     'round', 'rounds', 'bye', 'weekend', 'weekday',
-    'cbs', 'espn', 'fox', 'abc'
+    'cbs', 'espn', 'fox', 'abc', 'sports', 'avoid', 'thursday', 'friday', 'saturday', 'sunday',
   ])
 
   for (const name of multiWordTeams) {
@@ -104,6 +132,7 @@ function extractParameters(template: string, query: string): ConstraintParams {
       stopWords.add(piece) 
     }
   }
+  stopWords.add('team')
 
   const singleWordTeamRe = /\b([A-Z][a-z]+|[A-Z]{2,4})\b/g
   const teamMatches = query.match(singleWordTeamRe)
