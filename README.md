@@ -1,36 +1,282 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FastBreak Constraint Search – Template Matching Engine
 
-## Getting Started
+This project implements a search pipeline that classifies natural-language sports scheduling constraints into predefined templates using embeddings and vector similarity. It includes a Next.js frontend, Supabase backend, and Jina embedding service.
 
-First, run the development server:
+---
+
+## 🚀 **Live Demo**
+
+**Frontend:** [https://fastbreak-challenge.vercel.app/](https://fastbreak-challenge.vercel.app/)
+
+---
+
+## 📦 **Setup Instructions**
+
+### **1. Clone the repository**
+
+```bash
+git clone https://github.com/Diksha-Maurya/fastbreak-challenge.git
+cd fastbreak-challenge
+```
+
+---
+
+### **2. Install dependencies**
+
+#### **Backend / Next.js**
+
+```bash
+npm install
+```
+
+---
+
+### **3. Create your environment file**
+
+Create a file *.env.local* in the root folder with the template below:
+
+```bash
+JINA_API_KEY=<PUT VALUES HERE>
+NEXT_PUBLIC_SUPABASE_URL=<PUT VALUES HERE>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<PUT VALUES HERE>
+NEXT_PUBLIC_SITE_URL=<PUT VALUES HERE>
+```
+
+Update the variables with your real values.
+
+---
+
+### **4. Run the development server**
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Your app will be available on:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 🧱 **Architecture Overview**
 
-To learn more about Next.js, take a look at the following resources:
+### **1. Frontend (Next.js App Router)**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+* Once logged-in, the UI provides a clean search interface on the `/search` page.
+* Calls `/api/search` and receives the nearest embedding matches.
+* Converts cosine distance into a **confidence score**.
+* Uses regex-based parsing to extract structured parameters:
+  - `min`, `max`
+  - `games`
+  - `rounds`
+  - `venues`
+  - `networks`
+  - `teams`
+* Builds a normalized English constraint (`parsedConstraint`) based on the matched template.
+* Shows **alternatives** when confidence is low.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+### **2. Backend (Next.js API Routes)**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+* Receives search query.
+* Embeds user text using **Jina Embeddings v3**.
+* Performs vector similarity search via a Supabase RPC (`search_constraints`) that uses pgvector inside Postgres.
+* Calls a Supabase RPC `search_constraints(q, k)` that returns:
+  - `template`
+  - `text`
+  - `distance` (pgvector cosine distance)
+* Applies heuristic “nudging” to distance based on query text.
+* Returns sorted results to the frontend.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+### **3. Database (Supabase + pgvector)**
+
+This project uses Postgres with the `pgvector` extension (via Supabase) to store embeddings for each constraint example.
+
+#### Enable `pgvector`
+
+In the Supabase SQL editor, run:
+
+```sql
+-- Enable pgvector extension (may also be enabled via the Supabase UI)
+create extension if not exists vector;
+```
+
+#### Create tables
+
+```sql
+-- TEMPLATES: defines each constraint category
+create table if not exists templates (
+  id       serial primary key,
+  name     text not null unique,
+  ordinal  int  unique not null
+);
+
+-- CONSTRAINTS_CORPUS: sample/example texts tied to a template
+create table if not exists constraints_corpus (
+  id          bigserial primary key,
+  template_id int  not null references templates(id) on delete cascade,
+  text        text not null,
+  emb         vector(1024) not null
+);
+```
+
+#### Indexes
+
+```sql
+-- Avoid duplicate examples for the same template
+create unique index if not exists constraints_corpus_unique
+  on constraints_corpus (template_id, text);
+
+-- Speed up lookups by template
+create index if not exists constraints_corpus_template_id_idx
+  on constraints_corpus (template_id);
+
+-- Vector index for fast similarity search
+create index if not exists constraints_corpus_emb_ivfflat_idx
+  on constraints_corpus
+  using ivfflat (emb vector_cosine_ops);
+```
+---
+
+### **4. Embeddings Service**
+
+* Uses Jina AI Embeddings API:
+
+  * Endpoint: `https://api.jina.ai/v1/embeddings`
+  * Model: `jina-embeddings-v3`
+* Embedding dimension: **1024**
+* Returned vector used for vector search against pgvector.
+
+---
+
+## 🔍 **Search Implementation Explained**
+
+### **1. User enters a query**
+
+Text is sent to:
+
+```
+POST /api/search
+{
+  "query": "at least 2 back-to-back games before bye"
+}
+```
+
+---
+
+### 2. Pipeline inside `/api/search`
+
+1. **Embed the query using Jina**
+   - The API route calls `https://api.jina.ai/v1/embeddings` with `jina-embeddings-v3`.
+   - The returned embedding is a 1024-dimensional vector.
+
+2. **Vector search via Supabase RPC**
+   - The query embedding is passed to a Postgres function `search_constraints(q, k)`.
+   - `search_constraints` performs a pgvector similarity search over `constraints_corpus.emb` and returns the top `k` matches, including:
+     - `template`
+     - `text`
+     - `distance` (pgvector cosine-distance metric: lower = more similar)
+
+3. **Heuristic template nudging**
+   - Before returning results, the API applies small adjustments (“nudges”) to `distance` based on the query text:
+     - Sequence / back-to-back language → favors **Template 2**.
+     - Per-team schedule pattern language → favors **Template 3**.
+     - Generic scheduling with networks/venues/rivalry → tiny nudge toward **Template 1**.
+   - The adjusted results are re-sorted by distance and sent back to the frontend.
+
+4. **Response**
+   - The route returns:
+     ```json
+     {
+       "results": [
+         {
+           "template": "Template 2: Sequence Constraints",
+           "text": "...",
+           "distance": 0.21,
+           "...": "other columns from search_constraints"
+         },
+         ...
+       ]
+     }
+     ```
+
+
+#### **Step C — Scoring and confidence**
+
+* The closest match (smallest distance) is chosen as the top template.
+* Similarity is computed as: `similarity = 1 - distance`
+* Confidence is mapped to `[0, 1]` using:
+  `confidence = (similarity + 1) / 2`
+* When confidence < 0.75, alternative matches are included.
+
+---
+
+### **3. Parameter Extraction (Frontend)**
+
+Regex-based parsing on the frontend extracts:
+- `min`, `max`
+- `games`
+- `rounds`
+- `venues`
+- `networks`
+- `teams`
+
+These values are then assembled into a normalized English constraint via
+`buildParsedConstraint(template, parameters)`.
+
+If parameters are empty or confidence < 0.7, the UI avoids hallucination and shows a helpful error instead.
+
+---
+
+## 🗂️ Project Structure
+
+```
+/src
+    /app
+        /api/search
+            /route.ts
+        /auth
+            /callback
+            /sign-in
+            /sign-out
+        /search/page.tsx
+/scripts
+    seed.ts
+.env.example
+README.md
+```
+
+---
+
+## 🛠️ **Tech Stack**
+
+* **Next.js 14 (App Router)**
+* **TypeScript**
+* **Supabase (Postgres + pgvector)**
+* **Jina Embeddings v3**
+* **TailwindCSS**
+* **Vercel (Deployment)**
+
+---
+
+## 🧪 Seeding the Database
+
+Run:
+
+```bash
+npm run seed
+```
+
+This will:
+
+* Insert templates
+* Insert corpus examples
+* Generate embeddings
+* Upload to Supabase
+
+---
