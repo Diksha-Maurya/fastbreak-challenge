@@ -33,7 +33,6 @@ export async function POST(req: Request) {
     })
     if (error) throw error
 
-    // 3) Keyword-based nudge on distances (tie-breaker)
     const qt = query.toLowerCase()
 
     function nudge(template: string): number {
@@ -42,7 +41,7 @@ export async function POST(req: Request) {
     const isT3 = /Template 3: /.test(template)
 
     const hasSequenceWords =
-      /(back[\s-]?to[\s-]?back|consecutive|sequence|second\s+half)/.test(qt)
+      /(back[\s-]?to[\s-]?back|consecutive|sequence)/.test(qt)
 
     const hasByeSequence =
       /(either side of .*bye|either side of their bye|before their bye|after their bye|bye week)/.test(qt)
@@ -51,19 +50,24 @@ export async function POST(req: Request) {
       /(each team|every team|for teams|no team|per[-\s]?team)/.test(qt) &&
       /(home|away|bye|active)/.test(qt)
 
-    if ((hasSequenceWords || hasByeSequence) && isT2) return 0.10
+    let bump = 0
 
-    if ((hasSequenceWords || hasByeSequence) && isT1) return -0.05
-    // Small nudge to Template 3 for team-pattern scheduling
-    if (hasTeamPattern && isT3) return 0.03
+    // 1) True sequence / bye-sequence → favor Template 2, slightly penalize T1
+    if ((hasSequenceWords || hasByeSequence) && isT2) bump += 0.10
+    if ((hasSequenceWords || hasByeSequence) && isT1) bump -= 0.05
 
+    // 2) Per-team schedule pattern → favor Template 3, slightly penalize T2
+    if (hasTeamPattern && isT3) bump += 0.10
+    if (hasTeamPattern && isT2) bump -= 0.05
+
+    // 3) Generic scheduling (no sequence, no team-pattern) with obvious sched words → tiny nudge to T1
     if (!hasSequenceWords && !hasByeSequence && !hasTeamPattern && isT1 &&
         /(espn|cbs|network|venue|rivalry|schedule)/.test(qt)) {
-      return 0.01
-    }
-
-    return 0
+      bump += 0.01
   }
+
+  return bump
+}
 
     const adjusted = (rows ?? [])
       .map((r: any) => ({
