@@ -57,6 +57,11 @@ if (m) {
   }
 }
 
+if (template.startsWith('Template 2') && /\bno team\b/.test(q)) {
+  min = 0
+  max = 0
+}
+
   const games: string[] = []
   const rounds: string[] = []
   const venues: string[] = []
@@ -154,8 +159,9 @@ if (m) {
       games.push(...matchupMatches)
     }
   }
+  const uniqTeams = Array.from(new Set(teams))
 
-  return { min, max, games, rounds, venues, networks, teams }
+  return { min, max, games, rounds, venues, networks, teams: uniqTeams }
 }
 
 function buildParsedConstraint(template: string, params: ConstraintParams): string {
