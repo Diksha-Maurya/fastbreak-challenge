@@ -26,7 +26,7 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen grid place-items-center p-6">
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-3">
-        <h1 className="text-2xl font-semibold">Sign in</h1>
+        <div className="flex justify-center"><h1 className="text-2xl font-semibold mb-6">Sign in</h1></div>
           <input
             type="email"
             placeholder="you@example.com"
