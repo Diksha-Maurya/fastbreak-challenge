@@ -148,7 +148,7 @@ create index if not exists constraints_corpus_emb_ivfflat_idx
 * Uses Jina AI Embeddings API:
 
   * Endpoint: `https://api.jina.ai/v1/embeddings`
-  * Model: `jina-embeddings-v4`
+  * Model: `jina-embeddings-v4` [https://jina.ai/models/jina-embeddings-v4]
 * Embedding dimension: **1024**
 * Returned vector used for vector search against pgvector.
 
