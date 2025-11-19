@@ -39,7 +39,7 @@ Create a file *.env.local* in the root folder with the template below:
 JINA_API_KEY=<PUT VALUES HERE>
 NEXT_PUBLIC_SUPABASE_URL=<PUT VALUES HERE>
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<PUT VALUES HERE>
-NEXT_PUBLIC_SITE_URL=<PUT VALUES HERE>
+NEXT_PUBLIC_SITE_URL=<PUT VALUES HERE> [e.g., http://localhost:3000]
 ```
 
 Update the variables with your real values.
