@@ -10,13 +10,13 @@ const supabase = createClient(
 )
 
 const JINA_API = 'https://api.jina.ai/v1/embeddings'
-const JINA_MODEL = 'jina-embeddings-v3'
+const JINA_MODEL = 'jina-embeddings-v4'
 const HEADERS = { Authorization: `Bearer ${process.env.JINA_API_KEY}` }
 
 async function embed(texts: string[]) {
   const { data } = await axios.post(
     JINA_API,
-    { input: texts, model: JINA_MODEL },
+    { input: texts, model: JINA_MODEL, dimensions: 1024 },
     { headers: HEADERS }
   )
   return data.data.map((d: any) => d.embedding as number[])
