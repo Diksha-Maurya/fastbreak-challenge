@@ -86,6 +86,7 @@ if (template.startsWith('Template 2') && /\bno team\b/.test(q)) {
   if (/neutral site/.test(q)) venues.push('neutral_venues')
   if (/weekend/.test(q)) rounds.push('weekend_rounds')
   if (/weekday/.test(q)) rounds.push('weekday_rounds')
+  if (/first month/.test(q)) rounds.push("first_month_rounds")
   if (/final (two|2) (dates|weeks)/.test(q)) rounds.push('final_two_rounds')
   if (/second half/.test(q)) rounds.push('second_half_rounds')
   if (/(either side of .*bye|before their bye|after their bye|bye week)/.test(q)) {
@@ -124,7 +125,7 @@ if (template.startsWith('Template 2') && /\bno team\b/.test(q)) {
   teams.push(...multiWordTeams)
 
   const stopWords = new Set([
-    'make', 'sure', 'do', 'not', 'no',  'don', "don't", 'dont', 'play', 'plays', 'at', 'home', 'on',
+    'make', 'sure', 'every','do', 'not', 'no',  'don', "don't", 'dont', 'play', 'plays', 'at', 'home', 'on',
     'either', 'side', 'their', 'week', 'weeks', 'the', 'and', 'or', 'of',
     'in', 'across', 'ensure', 'schedule', 'guarantee', 'require', 'for',
     'each', 'that', 'least', 'most', 'min', 'max', 'game', 'games',

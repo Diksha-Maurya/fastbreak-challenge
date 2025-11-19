@@ -272,11 +272,30 @@ Run:
 npm run seed
 ```
 
+
 This will:
 
 * Insert templates
 * Insert corpus examples
 * Generate embeddings
 * Upload to Supabase
+
+---
+
+## **Future Improvements** 
+
+Since this project focuses on semantic template selection rather than full NLP parsing, a few enhancements could further improve accuracy and robustness:
+
+* LLM-based parameter extraction: Replace heuristics with a small LLM call for better handling of team names, rounds, and complex phrasing.
+
+* Expanded template examples: Adding more paraphrases would tighten embedding clusters and reduce borderline misclassifications.
+
+* Smarter entity recognition: Improve detection of teams, venues, and rounds using a small dictionary or lightweight NER model.
+
+* Better negation & number parsing: Handle cases like “never,” “exactly,” or “no later than” more precisely.
+
+* More natural parsed constraints: Generate cleaner, user-friendly constraint sentences instead of a strict canonical structure.
+
+These improvements are not required for the challenge but would make the system more robust and production-ready.
 
 ---
