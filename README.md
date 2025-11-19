@@ -82,7 +82,7 @@ http://localhost:3000
 ### **2. Backend (Next.js API Routes)**
 
 * Receives search query.
-* Embeds user text using **Jina Embeddings v3**.
+* Embeds user text using **Jina Embeddings v4**.
 * Performs vector similarity search via a Supabase RPC (`search_constraints`) that uses pgvector inside Postgres.
 * Calls a Supabase RPC `search_constraints(q, k)` that returns:
   - `template`
@@ -148,7 +148,7 @@ create index if not exists constraints_corpus_emb_ivfflat_idx
 * Uses Jina AI Embeddings API:
 
   * Endpoint: `https://api.jina.ai/v1/embeddings`
-  * Model: `jina-embeddings-v3`
+  * Model: `jina-embeddings-v4` [https://jina.ai/models/jina-embeddings-v4]
 * Embedding dimension: **1024**
 * Returned vector used for vector search against pgvector.
 
@@ -172,7 +172,7 @@ POST /api/search
 ### 2. Pipeline inside `/api/search`
 
 1. **Embed the query using Jina**
-   - The API route calls `https://api.jina.ai/v1/embeddings` with `jina-embeddings-v3`.
+   - The API route calls `https://api.jina.ai/v1/embeddings` with `jina-embeddings-v4`.
    - The returned embedding is a 1024-dimensional vector.
 
 2. **Vector search via Supabase RPC**
@@ -258,7 +258,7 @@ README.md
 * **Next.js 14 (App Router)**
 * **TypeScript**
 * **Supabase (Postgres + pgvector)**
-* **Jina Embeddings v3**
+* **Jina Embeddings v4**
 * **TailwindCSS**
 * **Vercel (Deployment)**
 
